@@ -245,7 +245,6 @@ class ReFound(PreTrainedModel):
         encoder_output = self.transformer(
             hidden_states=all_embedding,
             attention_mask=extended_attn_mask,
-            forward_mode=self.config['modal'],
             split_idx=split_idx,
         )
 

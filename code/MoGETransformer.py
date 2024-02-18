@@ -161,14 +161,14 @@ class MoGEEncoder(nn.Module):
                 hidden_states = layer_module(
                     hidden_states=hidden_states, 
                     attention_mask=attention_mask, 
-                    modality_type='poi_img_sep', 
+                    expert_selection='p_and_s', 
                     split_idx=split_idx,
                 )
             else:
                 hidden_states = layer_module(
                     hidden_states=hidden_states, 
                     attention_mask=attention_mask, 
-                    modality_type='poi_img_mix', 
+                    expert_selection='ps', 
                 )
         return hidden_states
 
