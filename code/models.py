@@ -36,7 +36,7 @@ class POIEmbed(nn.Module):
         super().__init__()
         self.config = config
         self.seq_len_poi = config['max_len_token']
-        self.num_grid = config['num_grid']
+        self.num_grid = config['num_grid_x'] * config['num_grid_y']
 
         self.word_embedding_table = nn.Embedding(config['vocab_size'], config['hidden_size'], padding_idx=0)
         self.word_level_pos_embedding_table = nn.Embedding(config['max_len_token'], config['hidden_size'])        
@@ -47,12 +47,12 @@ class POIEmbed(nn.Module):
         self.LayerNorm = nn.LayerNorm(config['hidden_size'], eps=config['layer_norm_eps'])
         self.dropout = nn.Dropout(config['hidden_dropout_prob'])
 
-    def forward(self, poi_name_token, word_level_pos_id, poi_level_pos_id, grid_level_pos_id, poi_cate_id):
-        poi_name_token_embedding = self.word_embedding_table(poi_name_token)
-        word_level_pos_embedding = self.word_level_pos_embedding_table(word_level_pos_id)
-        poi_level_pos_embedding = self.poi_level_pos_embedding_table(poi_level_pos_id)
-        grid_level_pos_embedding = self.grid_level_pos_embedding_table(grid_level_pos_id)
-        poi_cate_embedding = self.poi_cate_embedding_table(poi_cate_id)
+    def forward(self, poi_name_token_ids, word_level_pos_ids, poi_level_pos_ids, grid_level_pos_ids, poi_cate_ids):
+        poi_name_token_embedding = self.word_embedding_table(poi_name_token_ids)
+        word_level_pos_embedding = self.word_level_pos_embedding_table(word_level_pos_ids)
+        poi_level_pos_embedding = self.poi_level_pos_embedding_table(poi_level_pos_ids)
+        grid_level_pos_embedding = self.grid_level_pos_embedding_table(grid_level_pos_ids)
+        poi_cate_embedding = self.poi_cate_embedding_table(poi_cate_ids)
 
         poi_embedding = \
             poi_name_token_embedding + \
@@ -155,24 +155,24 @@ class ReFound(PreTrainedModel):
     def prepare_poi_data(self, poi_data, masking_poi):
 
         if masking_poi:
-            poi_name_token = poi_data['poi_name_token_ids_masked']
+            poi_name_token_ids = poi_data['poi_name_token_ids_masked']
         else:
-            poi_name_token = poi_data['poi_name_token_ids']
+            poi_name_token_ids = poi_data['poi_name_token_ids']
 
         attn_mask_poi = poi_data['attn_mask_poi']
-        word_level_pos_id = poi_data['word_level_pos_id']
-        poi_level_pos_id = poi_data['poi_level_pos_id']
-        grid_level_pos_id = poi_data['grid_level_pos_id']
-        poi_cate_id = poi_data['poi_cate_id']
+        word_level_pos_ids = poi_data['word_level_pos_ids']
+        poi_level_pos_ids = poi_data['poi_level_pos_ids']
+        grid_level_pos_ids = poi_data['grid_level_pos_ids']
+        poi_cate_ids = poi_data['poi_cate_ids']
             
 
         prepared_poi_data = {
-            'poi_name_token': poi_name_token,
+            'poi_name_token_ids': poi_name_token_ids,
             'attn_mask_poi': attn_mask_poi,
-            'word_level_pos_id': word_level_pos_id,
-            'poi_level_pos_id': poi_level_pos_id,
-            'grid_level_pos_id': grid_level_pos_id,
-            'poi_cate_id': poi_cate_id,
+            'word_level_pos_ids': word_level_pos_ids,
+            'poi_level_pos_ids': poi_level_pos_ids,
+            'grid_level_pos_ids': grid_level_pos_ids,
+            'poi_cate_ids': poi_cate_ids,
         }
         return prepared_poi_data
 
@@ -212,11 +212,11 @@ class ReFound(PreTrainedModel):
         )
 
         poi_embedding = self.poi_embed_module(
-            poi_name_token=prepared_poi_data['poi_name_token'],
-            word_level_pos_id=prepared_poi_data['word_level_pos_id'],
-            poi_level_pos_id=prepared_poi_data['poi_level_pos_id'],
-            grid_level_pos_id=prepared_poi_data['grid_level_pos_id'],
-            poi_cate_id=prepared_poi_data['poi_cate_id'],
+            poi_name_token_ids=prepared_poi_data['poi_name_token_ids'],
+            word_level_pos_ids=prepared_poi_data['word_level_pos_ids'],
+            poi_level_pos_ids=prepared_poi_data['poi_level_pos_ids'],
+            grid_level_pos_ids=prepared_poi_data['grid_level_pos_ids'],
+            poi_cate_ids=prepared_poi_data['poi_cate_ids'],
         )
         attn_mask_poi = prepared_poi_data['attn_mask_poi']
 
@@ -376,10 +376,7 @@ class ModelForPretraining(PreTrainedModel):
         return cmsa_loss
 
 
-    def compute_distillation_from_LFM(self, encoder_output, llm_poi_feat, have_llm_query):
-
-        if have_llm_query.sum() == 0:
-            return 0.0
+    def compute_distillation_from_LFM(self, encoder_output, llm_poi_feat):
             
         cls_token_poi = encoder_output[:, 0]
         pool_poi_emb = cls_token_poi
@@ -387,7 +384,7 @@ class ModelForPretraining(PreTrainedModel):
         pool_poi_emb = self.poi_proj_for_dlfm(pool_poi_emb)
         pool_poi_emb_norm = pool_poi_emb / pool_poi_emb.norm(dim=1, keepdim=True)
 
-        dlfm_loss = - self.cos_sim(pool_poi_emb_norm, llm_poi_feat)[have_llm_query].mean()
+        dlfm_loss = - self.cos_sim(pool_poi_emb_norm, llm_poi_feat).mean()
         return dlfm_loss
 
     
@@ -469,7 +466,6 @@ class ModelForPretraining(PreTrainedModel):
         img_masked_label,
         align_label,
         llm_poi_feat,
-        have_llm_query,
         vfm_img_feat,
         vlfm_img_feat,
     ):
@@ -513,7 +509,6 @@ class ModelForPretraining(PreTrainedModel):
         dlfm_loss = self.compute_distillation_from_LFM(
             encoder_output=encoder_output,
             llm_poi_feat=llm_poi_feat,
-            have_llm_query=have_llm_query
         )
         loss_dict['dlfm_loss'] = dlfm_loss
         

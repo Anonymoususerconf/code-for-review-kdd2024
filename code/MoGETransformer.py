@@ -169,6 +169,7 @@ class MoGEEncoder(nn.Module):
                     hidden_states=hidden_states, 
                     attention_mask=attention_mask, 
                     expert_selection='ps', 
+                    split_idx=split_idx,
                 )
         return hidden_states
 

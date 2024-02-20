@@ -56,8 +56,10 @@ def seed_setup(seed):
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
 
+
 def pair(t):
     return t if isinstance(t, tuple) else (t, t)
+
 
 def get_extended_attention_mask(attention_mask):
     dtype=torch.float
@@ -66,3 +68,18 @@ def get_extended_attention_mask(attention_mask):
     extended_attention_mask = (1.0 - extended_attention_mask) * torch.finfo(dtype).min
     return extended_attention_mask
 
+
+def adjust_learning_rate(optimizer, epoch, warmup_epochs, epoch_num, peak_lr, min_lr):
+
+    if epoch < warmup_epochs:
+        lr = peak_lr * epoch / warmup_epochs
+
+    else:
+        lr = min_lr + (peak_lr - min_lr) * (epoch_num - epoch) / (epoch_num - warmup_epochs)
+            
+    for param_group in optimizer.param_groups:
+        if "lr_scale" in param_group:
+            param_group["lr"] = lr * param_group["lr_scale"]
+        else:
+            param_group["lr"] = lr
+    return lr
