@@ -13,7 +13,8 @@ The training log and checkpoints will be saved in log/ and checkpoint/ .
 
 
 ## Fine-tuning 
-Fine-tuning the pre-trained ReFound on three urban region understanding tasks:
+Fine-tune the pre-trained ReFound on three urban region understanding tasks:
+
 UVD - Urban Village Detection
 CAP - Commercial Activeness Prediction
 POP - Popultion Prediction
