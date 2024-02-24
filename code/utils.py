@@ -3,7 +3,6 @@
 import numpy as np 
 import random
 import math
-import inspect
 import json
 import PIL.Image as pil
 import torch 
@@ -56,7 +55,6 @@ def seed_setup(seed):
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
 
-
 def pair(t):
     return t if isinstance(t, tuple) else (t, t)
 
@@ -83,3 +81,71 @@ def adjust_learning_rate(optimizer, epoch, warmup_epochs, epoch_num, peak_lr, mi
         else:
             param_group["lr"] = lr
     return lr
+
+
+
+
+def param_groups_lrd(model, weight_decay=0.05, no_weight_decay_list=[], layer_decay=.75):
+    """
+    Parameter groups for layer-wise lr decay
+    Following BEiT: https://github.com/microsoft/unilm/blob/master/beit/optim_factory.py#L58
+    """
+    param_group_names = {}
+    param_groups = {}
+
+    num_layers = len(model.encoder.transformer.layer) + 1
+
+    layer_scales = list(layer_decay ** (num_layers - i) for i in range(num_layers + 1))
+
+    for n, p in model.named_parameters():
+        if not p.requires_grad:
+            continue
+
+        if p.ndim == 1 or n in no_weight_decay_list:
+            g_decay = "no_decay"
+            this_decay = 0.
+        else:
+            g_decay = "decay"
+            this_decay = weight_decay
+            
+        layer_id = get_layer_id(n, num_layers)
+        group_name = "layer_%d_%s" % (layer_id, g_decay)
+
+        if group_name not in param_group_names:
+            this_scale = layer_scales[layer_id]
+
+            param_group_names[group_name] = {
+                "lr_scale": this_scale,
+                "weight_decay": this_decay,
+                "params": [],
+            }
+            param_groups[group_name] = {
+                "lr_scale": this_scale,
+                "weight_decay": this_decay,
+                "params": [],
+            }
+
+        param_group_names[group_name]["params"].append(n)
+        param_groups[group_name]["params"].append(p)
+    
+    return list(param_groups.values())
+
+
+def get_layer_id(name, num_layers):
+    if name.startswith('encoder'):
+        if name.startswith('encoder.poi_embed_module'):
+            return 0
+        elif name.startswith('encoder.img_embed_module'):
+            return 0
+        elif name.startswith('encoder.mod_embed_module'):
+            return 0
+        elif name.startswith('encoder.transformer'):
+            return int(name.split('.')[3]) + 1
+
+    elif name.startswith('target_prediction'):
+        return num_layers
+
+    elif name.startswith('attn_agg'):
+        return num_layers
+
+

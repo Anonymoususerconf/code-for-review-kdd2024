@@ -688,7 +688,7 @@ class PopulationPredictionHead(nn.Module):
 
 
 
-class FinetunePopulationPredictionHead(PreTrainedModel):
+class FinetunePopulationPrediction(PreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
 
