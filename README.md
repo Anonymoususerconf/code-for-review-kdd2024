@@ -10,3 +10,21 @@
 sh script_pretrain.sh
 ```
 The training log and checkpoints will be saved in log/ and checkpoint/ .
+
+
+## Fine-tuning 
+Fine-tuning the pre-trained ReFound on three urban region understanding tasks:
+UVD - Urban Village Detection
+CAP - Commercial Activeness Prediction
+POP - Popultion Prediction
+
+```
+sh script_finetune.sh
+```
+
+## Feature-based Prediction
+Use the pre-trained ReFound to extract region embedding first, and then train task-specific predictor that takes region embedding as inputs.
+
+```
+sh script_feature_based.sh
+```
